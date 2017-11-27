@@ -22,6 +22,7 @@ function createRenderTestCase (name) {
         done()
       }, 50)
     }).catch(err => {
+      console.log(err.stack)
       expect(err).toBe(null)
       done()
     })
