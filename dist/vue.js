@@ -3350,6 +3350,8 @@
   // { [key: string]: Function | { get: Function, set: Function } }
   function initComputed(vm, computed) {
     'development' !== 'production' && checkOptionType(vm, 'computed')
+
+    // watchers和vm._computedWatchers为同一对象
     var watchers = (vm._computedWatchers = Object.create(null))
 
     // 遍历computed的每个属性
@@ -3363,7 +3365,7 @@
       if ('development' !== 'production' && getter == null) {
         warn('这个计算属性没有定义getter "' + key + '".', vm)
       }
-      // 为计算属性创建内部watcher
+      // 为计算属性每个key创建watcher
       watchers[key] = new Watcher(
         vm,
         getter || noop,
@@ -3397,23 +3399,28 @@
    * 定义计算函数
    * @param {*} target vm
    * @param {*} key 键值
-   * @param {*} userDef 函数
+   * @param {*} userDef
    * 这个函数的作用就是把getter和setter应用到属性
    */
   function defineComputed(target, key, userDef) {
     if (typeof userDef === 'function') {
-      sharedPropertyDefinition.get = createComputedGetter(key)
+      // userDef是Function的情况
+      sharedPropertyDefinition.get = createComputedGetter(key) // 返回一个值
       sharedPropertyDefinition.set = noop
     } else {
+      // userDef是{ get: Function, set: Function } 的情况
       sharedPropertyDefinition.get = userDef.get
         ? userDef.cache !== false ? createComputedGetter(key) : userDef.get
         : noop
       sharedPropertyDefinition.set = userDef.set ? userDef.set : noop
+      // 在 Vue 未来的大版本中，计算属性的缓存验证(cache)将会被移除。把不缓存的计算属性转换为方法可以得到和之前相同的结果。
     }
+
     if (
       'development' !== 'production' &&
       sharedPropertyDefinition.set === noop
     ) {
+      // todo no setter又如何
       sharedPropertyDefinition.set = function () {
         warn(
           'Computed property "' +
@@ -3423,13 +3430,13 @@
         )
       }
     }
-    Object.defineProperty(target, key, sharedPropertyDefinition)
+    Object.defineProperty(target, key, sharedPropertyDefinition) // 大概作用是把computed的key绑到vm上
   }
-
+  // 计算属性的getter
   function createComputedGetter(key) {
     return function computedGetter() {
       var watcher = this._computedWatchers && this._computedWatchers[key] // 获取当个key的Watcher
-      if (watcher) { // 如果这个key有Watcher
+      if (watcher) { // 如果这个key有Watcher（todo 会没有吗？）
         if (watcher.dirty) { // 脏的（todo 什么情况下变脏）
           watcher.evaluate()
         }
@@ -3441,12 +3448,14 @@
     }
   }
 
-  // todo methods没有watcher怎么更新
+  // 问 methods没有watcher怎么更新?
+  // render的watcher处理methods更新
   function initMethods(vm, methods) {
     'development' !== 'production' && checkOptionType(vm, 'methods')
     var props = vm.$options.props
     for (var key in methods) {// 遍历方法的key
       vm[key] = methods[key] == null ? noop : bind(methods[key], vm) // 方法bind vm（拿this）
+      // 以下重名检测
       {
         if (methods[key] == null) {
           warn(
@@ -3468,9 +3477,9 @@
     'development' !== 'production' && checkOptionType(vm, 'watch')
     for (var key in watch) {
       var handler = watch[key]
-      if (Array.isArray(handler)) {// todo 为什么可以是array
+      if (Array.isArray(handler)) {// todo 为什么可以是array ,推测可能是mixin
         for (var i = 0; i < handler.length; i++) {
-          createWatcher(vm, key, handler[i])
+          createWatcher(vm, key, handler[i]) // 顺序运行handler
         }
       } else {
         createWatcher(vm, key, handler)
@@ -3489,7 +3498,7 @@
     // options 
     // deep -> 深度 watcher 
     // immediate -> 该回调将会在侦听开始之后被立即调用
-    return vm.$watch(keyOrFn, handler, options) // 调用$watch方法 （就在下面
+    return vm.$watch(keyOrFn, handler, options) // 调用$watch方法 （就在下面）
   }
 
   // 整合一个Vue对象
@@ -3520,9 +3529,12 @@
     Object.defineProperty(Vue.prototype, '$data', dataDef)
     Object.defineProperty(Vue.prototype, '$props', propsDef)
 
+    // 设置三个实例方法
     Vue.prototype.$set = set
     Vue.prototype.$delete = del
 
+    // 观察 Vue 实例变化的一个表达式或>计算属性函数<。回调函数得到的参数为新值和旧值。表达式只接受监督的键路径。对于更复杂的表达式，用一个函数取代。
+    // 返回值：{Function} unwatch
     Vue.prototype.$watch = function (expOrFn, cb, options) {
       var vm = this
       if (isPlainObject(cb)) {
