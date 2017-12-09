@@ -2932,10 +2932,7 @@
   var uid$2 = 0
 
   /**
-   * A watcher parses an expression, collects dependencies,
-   * and fires callback when the expression value changes.
-   * This is used for both the $watch() api and directives.
-   * 在表达式的值改变时，watcher处理一个表达式，依赖集合和调用回调函数。
+   * 在表达式的值改变时，watcher会处理一个表达式，依赖集合和调用回调函数。
    * $watch() api和指令都有使用
    * 参数
    * vm 实例
@@ -3063,6 +3060,7 @@
    */
   Watcher.prototype.update = function update() {
     /* istanbul ignore else */
+    // 如果是lazy watcher（计算属性的wacter），把dirty改为true，然后使用计算属性时候会运行evaluate重新求值
     if (this.lazy) {
       this.dirty = true
     } else if (this.sync) {
@@ -3110,8 +3108,8 @@
   }
 
   /**
-   * Evaluate the value of the watcher.
-   * This only gets called for lazy watchers.
+   * 求watcher的value
+   * 这个方法只会被lazy watcher调用
    */
   Watcher.prototype.evaluate = function evaluate() {
     this.value = this.get()
@@ -3348,6 +3346,9 @@
 
   // 初始化computed
   // { [key: string]: Function | { get: Function, set: Function } }
+  // 读取computed时返回watcher的value
+  // watcher的订阅目标改变时value才更新
+  // render函数渲染computed的时候computed应该把他的watcher的dep交给了render的watcher （未证实）
   function initComputed(vm, computed) {
     'development' !== 'production' && checkOptionType(vm, 'computed')
 
@@ -3370,7 +3371,7 @@
         vm,
         getter || noop,
         noop,
-        computedWatcherOptions
+        computedWatcherOptions // { lazy: true }
       )
 
       // component-defined computed properties are already defined on the
@@ -3399,7 +3400,7 @@
    * 定义计算函数
    * @param {*} target vm
    * @param {*} key 键值
-   * @param {*} userDef
+   * @param {*} userDef Function | { get: Function, set: Function }
    * 这个函数的作用就是把getter和setter应用到属性
    */
   function defineComputed(target, key, userDef) {
